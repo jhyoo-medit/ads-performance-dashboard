@@ -297,21 +297,37 @@ function filterCampaigns(){
   });
 }
 
+function fetchWithTimeout(url,timeout=25000){
+  return Promise.race([
+    fetch(url).then(r=>r.json()),
+    new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),timeout))
+  ]);
+}
+
 async function loadData(){
   setStatus('Loading…',false);
   const s=document.getElementById('startDate').value,e=document.getElementById('endDate').value;
   state.dateStart=s;state.dateEnd=e;
-  document.getElementById('contentArea').innerHTML=`<div class="loading-wrap"><div class="loading-spinner"></div><div class="loading-msg">Fetching API data…</div></div>`;
-  const[gSum,fbSum,gDay,fbDay,gGeo,gDev,fbGeo,fbDev]=await Promise.all([
-    fetch(`${WORKER}/googleads?start_date=${s}&end_date=${e}&mode=summary`).then(r=>r.json()).catch(()=>({results:[]})),
-    fetch(`${WORKER}/facebookads?start_date=${s}&end_date=${e}&mode=summary`).then(r=>r.json()).catch(()=>({data:[]})),
-    fetch(`${WORKER}/googleads?start_date=${s}&end_date=${e}&mode=daily`).then(r=>r.json()).catch(()=>({results:[]})),
-    fetch(`${WORKER}/facebookads?start_date=${s}&end_date=${e}&mode=daily`).then(r=>r.json()).catch(()=>({data:[]})),
-    fetch(`${WORKER}/googleads?start_date=${s}&end_date=${e}&mode=geo`).then(r=>r.json()).catch(()=>({results:[]})),
-    fetch(`${WORKER}/googleads?start_date=${s}&end_date=${e}&mode=device`).then(r=>r.json()).catch(()=>({results:[]})),
-    fetch(`${WORKER}/facebookads?start_date=${s}&end_date=${e}&mode=geo`).then(r=>r.json()).catch(()=>({data:[]})),
-    fetch(`${WORKER}/facebookads?start_date=${s}&end_date=${e}&mode=device`).then(r=>r.json()).catch(()=>({data:[]})),
+  const area=document.getElementById('contentArea');
+
+  // Step 1: Google Ads (순차 - 동일 OAuth token 재사용 위해)
+  area.innerHTML=`<div class="loading-wrap"><div class="loading-spinner"></div><div class="loading-msg">Loading Google Ads data…</div></div>`;
+  const gUrl=m=>`${WORKER}/googleads?start_date=${s}&end_date=${e}&mode=${m}`;
+  const gSum  = await fetchWithTimeout(gUrl('summary')).catch(()=>({results:[]}));
+  const gDay  = await fetchWithTimeout(gUrl('daily')).catch(()=>({results:[]}));
+  const gGeo  = await fetchWithTimeout(gUrl('geo')).catch(()=>({results:[]}));
+  const gDev  = await fetchWithTimeout(gUrl('device')).catch(()=>({results:[]}));
+
+  // Step 2: Meta Ads (병렬 가능 - 토큰 고정)
+  area.innerHTML=`<div class="loading-wrap"><div class="loading-spinner"></div><div class="loading-msg">Loading Meta Ads data…</div></div>`;
+  const fbUrl=m=>`${WORKER}/facebookads?start_date=${s}&end_date=${e}&mode=${m}`;
+  const[fbSum,fbDay,fbGeo,fbDev]=await Promise.all([
+    fetchWithTimeout(fbUrl('summary')).catch(()=>({data:[]})),
+    fetchWithTimeout(fbUrl('daily')).catch(()=>({data:[]})),
+    fetchWithTimeout(fbUrl('geo')).catch(()=>({data:[]})),
+    fetchWithTimeout(fbUrl('device')).catch(()=>({data:[]})),
   ]);
+
   state.gSummary=gSum.results||[];state.fbSummary=fbSum.data||[];
   state.gDaily=gDay.results||[];state.fbDaily=fbDay.data||[];
   state.gGeo=gGeo.results||[];state.gDevice=gDev.results||[];
