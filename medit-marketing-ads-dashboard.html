@@ -234,7 +234,7 @@ input[type="date"]::-webkit-calendar-picker-indicator { filter:invert(.6); curso
 </div>
 <script>
 const WORKER='https://black-pine-7262.jinhyuk-medit.workers.dev';
-const state={gSummary:[],fbSummary:[],gDaily:[],fbDaily:[],gGeo:[],gDevice:[],fbGeo:[],fbDevice:[],platforms:{google:true,meta:true},metrics:['impressions','clicks','ctr','spend','cpm','cpc'],selectedCampaigns:new Set(),allCampaigns:[],dateStart:'',dateEnd:'',loaded:false,currentPanel:'overview'};
+const state={gSummary:[],fbSummary:[],gDaily:[],fbDaily:[],gGeo:[],gDevice:[],fbGeo:[],fbDevice:[],fbPlatform:[],platforms:{google:true,meta:true},metrics:['impressions','clicks','ctr','spend','cpm','cpc'],selectedCampaigns:new Set(),allCampaigns:[],dateStart:'',dateEnd:'',loaded:false,currentPanel:'overview'};
 const charts={};
 
 function init(){setPreset(30,null,false);loadData();}
@@ -321,17 +321,18 @@ async function loadData(){
   // Step 2: Meta Ads (병렬 가능 - 토큰 고정)
   area.innerHTML=`<div class="loading-wrap"><div class="loading-spinner"></div><div class="loading-msg">Loading Meta Ads data…</div></div>`;
   const fbUrl=m=>`${WORKER}/facebookads?start_date=${s}&end_date=${e}&mode=${m}`;
-  const[fbSum,fbDay,fbGeo,fbDev]=await Promise.all([
+  const[fbSum,fbDay,fbGeo,fbDev,fbPlat]=await Promise.all([
     fetchWithTimeout(fbUrl('summary')).catch(()=>({data:[]})),
     fetchWithTimeout(fbUrl('daily')).catch(()=>({data:[]})),
     fetchWithTimeout(fbUrl('geo')).catch(()=>({data:[]})),
     fetchWithTimeout(fbUrl('device')).catch(()=>({data:[]})),
+    fetchWithTimeout(fbUrl('platform')).catch(()=>({data:[]})),
   ]);
 
   state.gSummary=gSum.results||[];state.fbSummary=fbSum.data||[];
   state.gDaily=gDay.results||[];state.fbDaily=fbDay.data||[];
   state.gGeo=gGeo.results||[];state.gDevice=gDev.results||[];
-  state.fbGeo=fbGeo.data||[];state.fbDevice=fbDev.data||[];
+  state.fbGeo=fbGeo.data||[];state.fbDevice=fbDev.data||[];state.fbPlatform=fbPlat.data||[];
   state.loaded=true;
   const gCamps=[...new Set(state.gSummary.map(r=>r.campaign.name))];
   const fbCamps=[...new Set(state.fbSummary.map(r=>r.campaign_name))];
@@ -373,7 +374,7 @@ const fGD=()=>state.platforms.google?state.gDaily.filter(r=>state.selectedCampai
 const fFbD=()=>state.platforms.meta?state.fbDaily.filter(r=>state.selectedCampaigns.has(r.campaign_name)):[];
 
 function aggG(d){return d.reduce((a,r)=>{a.impr+=parseInt(r.metrics.impressions||0);a.clicks+=parseInt(r.metrics.clicks||0);a.cost+=parseInt(r.metrics.costMicros||0)/1e6;return a;},{impr:0,clicks:0,cost:0});}
-function aggFb(d){return d.reduce((a,r)=>{a.impr+=parseInt(r.impressions||0);a.clicks+=parseInt(r.clicks||0);a.spend+=parseFloat(r.spend||0);return a;},{impr:0,clicks:0,spend:0});}
+function aggFb(d){return d.reduce((a,r)=>{a.impr+=parseInt(r.impressions||0);a.clicks+=parseInt(r.clicks||0);a.spend+=parseFloat(r.spend||0);a.video_view+=parseInt(r.video_view||0);a.vp25+=parseInt(r.video_p25_watched_actions||0);a.vp50+=parseInt(r.video_p50_watched_actions||0);a.vp75+=parseInt(r.video_p75_watched_actions||0);a.vp100+=parseInt(r.video_p100_watched_actions||0);return a;},{impr:0,clicks:0,spend:0,video_view:0,vp25:0,vp50:0,vp75:0,vp100:0});}
 function derived(impr,clicks,cost){return{ctr:impr>0?clicks/impr*100:0,cpm:impr>0?cost/impr*1000:0,cpc:clicks>0?cost/clicks:0};}
 
 const fmt=n=>Number(n).toLocaleString();
@@ -399,6 +400,8 @@ function renderOverview(){
     if(state.metrics.includes('clicks'))kpis.push({p:'meta',l:'Clicks',v:fmt(fa.clicks)});
     if(state.metrics.includes('ctr'))kpis.push({p:'meta',l:'CTR (avg)',v:fPct(fm.ctr)});
     if(state.metrics.includes('spend'))kpis.push({p:'meta',l:'Spend (KRW)',v:fKRW(fa.spend)});
+    if(fa.video_view>0)kpis.push({p:'meta',l:'Video Views',v:fmt(fa.video_view)});
+    if(fa.video_view>0&&fa.impr>0)kpis.push({p:'meta',l:'VTR (3s)',v:(fa.video_view/fa.impr*100).toFixed(2)+'%'});
   }
   area.innerHTML=`
     <div class="kpi-grid">${kpis.map(k=>`<div class="kpi"><div class="kpi-platform"><span class="dot ${k.p}"></span>${k.p==='google'?'Google Ads':'Meta Ads'}</div><div class="kpi-value">${k.v}</div><div class="kpi-label">${k.l}</div><div class="kpi-bar ${k.p}" style="width:100%"></div></div>`).join('')}</div>
@@ -787,11 +790,46 @@ function renderDevice(){
     });
   }
 
+  // ── Meta Platform (Facebook/Instagram) ──
+  const byPlat={};
+  state.fbPlatform.forEach(r=>{
+    const p=r.publisher_platform||'unknown';
+    if(!byPlat[p])byPlat[p]={impr:0,clicks:0,spend:0};
+    byPlat[p].impr+=parseInt(r.impressions||0);
+    byPlat[p].clicks+=parseInt(r.clicks||0);
+    byPlat[p].spend+=parseFloat(r.spend||0);
+  });
+  const platList=Object.keys(byPlat).filter(p=>byPlat[p].spend>0||byPlat[p].impr>0);
+  const PLAT_COLORS={'facebook':'rgba(8,102,255,.7)','instagram':'rgba(124,111,255,.7)','audience_network':'rgba(34,211,160,.7)','messenger':'rgba(240,192,64,.7)'};
+
+  // Append platform section to contentArea
+  const platSection=document.createElement('div');
+  platSection.innerHTML=`
+    <div class="chart-row" style="margin-top:8px">
+      <div class="card"><div class="card-header"><span class="card-title">Meta Ads · Spend by Platform (KRW)</span><span class="card-badge meta">Meta</span></div><div class="chart-wrap"><canvas id="devPlatChart"></canvas></div></div>
+      <div class="card">
+        <div class="card-header"><span class="card-title">Meta Ads · Platform Performance (KRW)</span><span class="card-badge meta">Meta</span></div>
+        <div style="overflow-x:auto"><table class="rank-table">
+          <thead><tr><th>Platform</th><th>Impressions</th><th>Clicks</th><th>CTR</th><th>Spend (KRW)</th><th>CPC (KRW)</th></tr></thead>
+          <tbody>${platList.map(p=>{
+            const d=byPlat[p];
+            const ctr=d.impr>0?d.clicks/d.impr*100:0;
+            const cpc=d.clicks>0?d.spend/d.clicks:0;
+            const label=p.charAt(0).toUpperCase()+p.slice(1).replace('_',' ');
+            return `<tr><td style="font-weight:600">${label}</td><td style="color:var(--text2)">${fmt(d.impr)}</td><td style="color:var(--text2)">${fmt(d.clicks)}</td><td>${ctr.toFixed(2)}%</td><td>${fKRW(d.spend)}</td><td style="color:var(--text2)">${fKRW(cpc)}</td></tr>`;
+          }).join('')}</tbody>
+        </table></div>
+      </div>
+    </div>`;
+  area.appendChild(platSection);
+
   setTimeout(()=>{
     const c1=document.getElementById('devSpendChart');
     if(c1)charts.devS=new Chart(c1,{type:'doughnut',data:{labels:devices.map(d=>DEVICE_LABELS[d]||d),datasets:[{data:devices.map(d=>byDevice[d].cost.toFixed(2)),backgroundColor:devices.map(d=>DEVICE_COLORS[d]||'rgba(82,82,106,.5)'),borderWidth:2,borderColor:'#111118'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:true,position:'bottom',labels:{color:'#a0a0b8',font:{family:'DM Mono',size:10},padding:10,boxWidth:12}},tooltip:{backgroundColor:'#18181f',borderColor:'#2e2e3d',borderWidth:1,titleColor:'#e2e2ec',bodyColor:'#a0a0b8',titleFont:{family:'DM Mono'},bodyFont:{family:'DM Mono'}}}}});
     const c2=document.getElementById('devFbSpendChart');
     if(c2)charts.devFbS=new Chart(c2,{type:'doughnut',data:{labels:fbDevices,datasets:[{data:fbDevices.map(d=>byFbDevice[d].spend.toFixed(0)),backgroundColor:fbDevices.map((_,i)=>['rgba(8,102,255,.7)','rgba(124,111,255,.7)','rgba(34,211,160,.7)','rgba(240,192,64,.7)'][i]||'rgba(82,82,106,.5)'),borderWidth:2,borderColor:'#111118'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:true,position:'bottom',labels:{color:'#a0a0b8',font:{family:'DM Mono',size:10},padding:10,boxWidth:12}},tooltip:{backgroundColor:'#18181f',borderColor:'#2e2e3d',borderWidth:1,titleColor:'#e2e2ec',bodyColor:'#a0a0b8',titleFont:{family:'DM Mono'},bodyFont:{family:'DM Mono'}}}}});
+    const c3=document.getElementById('devPlatChart');
+    if(c3)charts.devPlat=new Chart(c3,{type:'doughnut',data:{labels:platList.map(p=>p.charAt(0).toUpperCase()+p.slice(1).replace('_',' ')),datasets:[{data:platList.map(p=>byPlat[p].spend.toFixed(0)),backgroundColor:platList.map(p=>PLAT_COLORS[p]||'rgba(82,82,106,.5)'),borderWidth:2,borderColor:'#111118'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:true,position:'bottom',labels:{color:'#a0a0b8',font:{family:'DM Mono',size:10},padding:10,boxWidth:12}},tooltip:{backgroundColor:'#18181f',borderColor:'#2e2e3d',borderWidth:1,titleColor:'#e2e2ec',bodyColor:'#a0a0b8',titleFont:{family:'DM Mono'},bodyFont:{family:'DM Mono'}}}}});
   },50);
 }
 
@@ -1003,6 +1041,53 @@ function exportExcel(){
   const ws5fb=XLSX.utils.aoa_to_sheet(fbDevRows);
   ws5fb['!cols']=[{wch:18},{wch:14},{wch:12},{wch:10},{wch:14},{wch:12}];
   XLSX.utils.book_append_sheet(wb,ws5fb,'Meta Ads - Device');
+
+  // ── Sheet 7: Meta Ads Video ──
+  const fbVideoHeaders=['Campaign','Impressions','Video Views (3s+)','VTR (%)','25% View','50% View','75% View','100% View'];
+  const fbVideoRows=[fbVideoHeaders];
+  state.fbSummary.forEach(r=>{
+    const impr=parseInt(r.impressions||0);
+    const vv=parseInt(r.video_view||0);
+    const vtr=impr>0?(vv/impr*100):0;
+    if(vv>0){
+      fbVideoRows.push([
+        r.campaign_name,
+        impr,
+        vv,
+        parseFloat(vtr.toFixed(2)),
+        parseInt(r.video_p25_watched_actions||0),
+        parseInt(r.video_p50_watched_actions||0),
+        parseInt(r.video_p75_watched_actions||0),
+        parseInt(r.video_p100_watched_actions||0),
+      ]);
+    }
+  });
+  if(fbVideoRows.length>1){
+    const ws7=XLSX.utils.aoa_to_sheet(fbVideoRows);
+    ws7['!cols']=[{wch:50},{wch:14},{wch:16},{wch:10},{wch:12},{wch:12},{wch:12},{wch:12}];
+    XLSX.utils.book_append_sheet(wb,ws7,'Meta Ads - Video');
+  }
+
+  // ── Sheet: Meta Ads Platform ──
+  const fbPlatHeaders=['Platform','Impressions','Clicks','CTR (%)','Spend (KRW)','CPC (KRW)'];
+  const fbPlatRows=[fbPlatHeaders];
+  const fbPlatAgg={};
+  state.fbPlatform.forEach(r=>{
+    const p=r.publisher_platform||'unknown';
+    if(!fbPlatAgg[p])fbPlatAgg[p]={impr:0,clicks:0,spend:0};
+    fbPlatAgg[p].impr+=parseInt(r.impressions||0);
+    fbPlatAgg[p].clicks+=parseInt(r.clicks||0);
+    fbPlatAgg[p].spend+=parseFloat(r.spend||0);
+  });
+  Object.entries(fbPlatAgg).forEach(([p,d])=>{
+    const ctr=d.impr>0?d.clicks/d.impr*100:0;
+    const cpc=d.clicks>0?d.spend/d.clicks:0;
+    const label=p.charAt(0).toUpperCase()+p.slice(1).replace('_',' ');
+    fbPlatRows.push([label,d.impr,d.clicks,parseFloat(ctr.toFixed(2)),Math.round(d.spend),Math.round(cpc)]);
+  });
+  const wsPlt=XLSX.utils.aoa_to_sheet(fbPlatRows);
+  wsPlt['!cols']=[{wch:20},{wch:14},{wch:12},{wch:10},{wch:14},{wch:12}];
+  XLSX.utils.book_append_sheet(wb,wsPlt,'Meta Ads - Platform');
 
   // Download
   const dateStr=state.dateStart+'_'+state.dateEnd;
