@@ -756,7 +756,7 @@ function renderDevice(){
             const d=byDevice[dev];
             const ctr=d.impr>0?d.clicks/d.impr*100:0;
             const cpc=d.clicks>0?d.cost/d.clicks:0;
-            return \`<tr><td style="font-weight:600">\${DEVICE_LABELS[dev]||dev}</td><td style="color:var(--text2)">\${fmt(d.impr)}</td><td style="color:var(--text2)">\${fmt(d.clicks)}</td><td>\${ctr.toFixed(2)}%</td><td>\${fUSD(d.cost)}</td><td style="color:var(--text2)">\${fUSD(cpc)}</td></tr>\`;
+            return `<tr><td style="font-weight:600">${DEVICE_LABELS[dev]||dev}</td><td style="color:var(--text2)">${fmt(d.impr)}</td><td style="color:var(--text2)">${fmt(d.clicks)}</td><td>${ctr.toFixed(2)}%</td><td>${fUSD(d.cost)}</td><td style="color:var(--text2)">${fUSD(cpc)}</td></tr>`;
           }).join('')}</tbody>
         </table></div>
       </div>
@@ -768,7 +768,7 @@ function renderDevice(){
             const d=byFbDevice[dev];
             const ctr=d.impr>0?d.clicks/d.impr*100:0;
             const cpc=d.clicks>0?d.spend/d.clicks:0;
-            return \`<tr><td style="font-weight:600">\${dev}</td><td style="color:var(--text2)">\${fmt(d.impr)}</td><td style="color:var(--text2)">\${fmt(d.clicks)}</td><td>\${ctr.toFixed(2)}%</td><td>\${fKRW(d.spend)}</td><td style="color:var(--text2)">\${fKRW(cpc)}</td></tr>\`;
+            return `<tr><td style="font-weight:600">${dev}</td><td style="color:var(--text2)">${fmt(d.impr)}</td><td style="color:var(--text2)">${fmt(d.clicks)}</td><td>${ctr.toFixed(2)}%</td><td>${fKRW(d.spend)}</td><td style="color:var(--text2)">${fKRW(cpc)}</td></tr>`;
           }).join('')}</tbody>
         </table></div>
       </div>
