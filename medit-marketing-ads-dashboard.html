@@ -44,7 +44,7 @@ header { padding:22px 36px; border-bottom:1px solid var(--border); display:flex;
 .status-pill::before { content:''; width:5px; height:5px; background:var(--green); border-radius:50%; animation:blink 2s ease-in-out infinite; }
 @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.3} }
 .main { display:flex; flex:1; }
-.sidebar { width:272px; flex-shrink:0; border-right:1px solid var(--border); padding:20px 16px; display:flex; flex-direction:column; gap:20px; background:var(--surface); overflow-y:auto; max-height:calc(100vh - 69px); position:sticky; top:69px; }
+.sidebar { width:300px; flex-shrink:0; border-right:1px solid var(--border); padding:20px 16px; display:flex; flex-direction:column; gap:20px; background:var(--surface); overflow-y:auto; max-height:calc(100vh - 69px); position:sticky; top:69px; overflow-x:hidden; }
 .sidebar-section { display:flex; flex-direction:column; gap:8px; }
 .sidebar-label { font-family:var(--mono); font-size:10px; color:var(--muted); letter-spacing:.14em; text-transform:uppercase; padding-bottom:5px; border-bottom:1px solid var(--border); }
 .date-inputs { display:flex; flex-direction:column; gap:5px; }
@@ -84,8 +84,8 @@ input[type="date"]::-webkit-calendar-picker-indicator { filter:invert(.6); curso
 .search-input:focus { border-color:var(--accent); }
 .search-input::placeholder { color:var(--muted); }
 .search-icon { position:absolute; left:8px; top:50%; transform:translateY(-50%); color:var(--muted); font-size:12px; pointer-events:none; }
-.campaign-list { display:flex; flex-direction:column; gap:3px; max-height:180px; overflow-y:auto; }
-.campaign-item { font-family:var(--mono); font-size:10px; padding:5px 9px; border-radius:5px; cursor:pointer; color:var(--text2); border:1px solid transparent; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; transition:all .15s; }
+.campaign-list { display:flex; flex-direction:column; gap:3px; max-height:220px; overflow-y:auto; background:transparent; }
+.campaign-item { font-family:var(--mono); font-size:10px; padding:5px 8px; border-radius:5px; cursor:pointer; color:#a0a0b8; border:1px solid transparent; white-space:normal; overflow:visible; word-break:break-word; line-height:1.4; transition:all .15s; display:block; width:100%; background:transparent; }
 .campaign-item:hover { background:var(--surface2); color:var(--text); }
 .campaign-item.selected { background:rgba(124,111,255,.08); border-color:rgba(124,111,255,.2); color:var(--text); }
 .select-all-btn { font-family:var(--mono); font-size:10px; color:var(--accent2); background:none; border:none; cursor:pointer; text-align:left; padding:3px 0; letter-spacing:.05em; }
