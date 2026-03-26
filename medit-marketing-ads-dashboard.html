@@ -234,7 +234,7 @@ input[type="date"]::-webkit-calendar-picker-indicator { filter:invert(.6); curso
 </div>
 <script>
 const WORKER='https://black-pine-7262.jinhyuk-medit.workers.dev';
-const state={gSummary:[],fbSummary:[],gDaily:[],fbDaily:[],gGeo:[],gDevice:[],fbGeo:[],platforms:{google:true,meta:true},metrics:['impressions','clicks','ctr','spend','cpm','cpc'],selectedCampaigns:new Set(),allCampaigns:[],dateStart:'',dateEnd:'',loaded:false,currentPanel:'overview'};
+const state={gSummary:[],fbSummary:[],gDaily:[],fbDaily:[],gGeo:[],gDevice:[],fbGeo:[],fbDevice:[],platforms:{google:true,meta:true},metrics:['impressions','clicks','ctr','spend','cpm','cpc'],selectedCampaigns:new Set(),allCampaigns:[],dateStart:'',dateEnd:'',loaded:false,currentPanel:'overview'};
 const charts={};
 
 function init(){setPreset(30,null,false);loadData();}
@@ -302,7 +302,7 @@ async function loadData(){
   const s=document.getElementById('startDate').value,e=document.getElementById('endDate').value;
   state.dateStart=s;state.dateEnd=e;
   document.getElementById('contentArea').innerHTML=`<div class="loading-wrap"><div class="loading-spinner"></div><div class="loading-msg">Fetching API data…</div></div>`;
-  const[gSum,fbSum,gDay,fbDay,gGeo,gDev,fbGeo]=await Promise.all([
+  const[gSum,fbSum,gDay,fbDay,gGeo,gDev,fbGeo,fbDev]=await Promise.all([
     fetch(`${WORKER}/googleads?start_date=${s}&end_date=${e}&mode=summary`).then(r=>r.json()).catch(()=>({results:[]})),
     fetch(`${WORKER}/facebookads?start_date=${s}&end_date=${e}&mode=summary`).then(r=>r.json()).catch(()=>({data:[]})),
     fetch(`${WORKER}/googleads?start_date=${s}&end_date=${e}&mode=daily`).then(r=>r.json()).catch(()=>({results:[]})),
@@ -310,11 +310,12 @@ async function loadData(){
     fetch(`${WORKER}/googleads?start_date=${s}&end_date=${e}&mode=geo`).then(r=>r.json()).catch(()=>({results:[]})),
     fetch(`${WORKER}/googleads?start_date=${s}&end_date=${e}&mode=device`).then(r=>r.json()).catch(()=>({results:[]})),
     fetch(`${WORKER}/facebookads?start_date=${s}&end_date=${e}&mode=geo`).then(r=>r.json()).catch(()=>({data:[]})),
+    fetch(`${WORKER}/facebookads?start_date=${s}&end_date=${e}&mode=device`).then(r=>r.json()).catch(()=>({data:[]})),
   ]);
   state.gSummary=gSum.results||[];state.fbSummary=fbSum.data||[];
   state.gDaily=gDay.results||[];state.fbDaily=fbDay.data||[];
   state.gGeo=gGeo.results||[];state.gDevice=gDev.results||[];
-  state.fbGeo=fbGeo.data||[];
+  state.fbGeo=fbGeo.data||[];state.fbDevice=fbDev.data||[];
   state.loaded=true;
   const gCamps=[...new Set(state.gSummary.map(r=>r.campaign.name))];
   const fbCamps=[...new Set(state.fbSummary.map(r=>r.campaign_name))];
@@ -713,23 +714,48 @@ function renderDevice(){
 
   const devices=Object.keys(byDevice).filter(d=>byDevice[d].impr>0||byDevice[d].cost>0);
 
+  // ── Meta device aggregation ──
+  const byFbDevice={};
+  state.fbDevice.forEach(r=>{
+    const dev=r.device_platform||'other';
+    if(!byFbDevice[dev])byFbDevice[dev]={impr:0,clicks:0,spend:0};
+    byFbDevice[dev].impr+=parseInt(r.impressions||0);
+    byFbDevice[dev].clicks+=parseInt(r.clicks||0);
+    byFbDevice[dev].spend+=parseFloat(r.spend||0);
+  });
+  const fbDevices=Object.keys(byFbDevice).filter(d=>byFbDevice[d].impr>0||byFbDevice[d].spend>0);
+
   area.innerHTML=`
     <div class="kpi-grid" id="deviceKpis"></div>
     <div class="chart-row">
-      <div class="card"><div class="card-header"><span class="card-title">Spend by Device (USD)</span><span class="card-badge google">Google</span></div><div class="chart-wrap"><canvas id="devSpendChart"></canvas></div></div>
-      <div class="card"><div class="card-header"><span class="card-title">Impressions by Device</span><span class="card-badge google">Google</span></div><div class="chart-wrap"><canvas id="devImprChart"></canvas></div></div>
+      <div class="card"><div class="card-header"><span class="card-title">Google Ads · Spend by Device (USD)</span><span class="card-badge google">Google</span></div><div class="chart-wrap"><canvas id="devSpendChart"></canvas></div></div>
+      <div class="card"><div class="card-header"><span class="card-title">Meta Ads · Spend by Device (KRW)</span><span class="card-badge meta">Meta</span></div><div class="chart-wrap"><canvas id="devFbSpendChart"></canvas></div></div>
     </div>
-    <div class="card">
-      <div class="card-header"><span class="card-title">Device Performance Detail</span><span class="card-badge google">Google Ads</span></div>
-      <div style="overflow-x:auto"><table class="rank-table">
-        <thead><tr><th>Device</th><th>Impressions</th><th>Clicks</th><th>CTR</th><th>Spend (USD)</th><th>CPC (USD)</th></tr></thead>
-        <tbody>${devices.map(dev=>{
-          const d=byDevice[dev];
-          const ctr=d.impr>0?d.clicks/d.impr*100:0;
-          const cpc=d.clicks>0?d.cost/d.clicks:0;
-          return `<tr><td style="font-weight:600">${DEVICE_LABELS[dev]||dev}</td><td style="color:var(--text2)">${fmt(d.impr)}</td><td style="color:var(--text2)">${fmt(d.clicks)}</td><td>${ctr.toFixed(2)}%</td><td>${fUSD(d.cost)}</td><td style="color:var(--text2)">${fUSD(cpc)}</td></tr>`;
-        }).join('')}</tbody>
-      </table></div>
+    <div class="chart-row">
+      <div class="card">
+        <div class="card-header"><span class="card-title">Google Ads · Device Performance (USD)</span><span class="card-badge google">Google</span></div>
+        <div style="overflow-x:auto"><table class="rank-table">
+          <thead><tr><th>Device</th><th>Impressions</th><th>Clicks</th><th>CTR</th><th>Spend (USD)</th><th>CPC (USD)</th></tr></thead>
+          <tbody>${devices.map(dev=>{
+            const d=byDevice[dev];
+            const ctr=d.impr>0?d.clicks/d.impr*100:0;
+            const cpc=d.clicks>0?d.cost/d.clicks:0;
+            return \`<tr><td style="font-weight:600">\${DEVICE_LABELS[dev]||dev}</td><td style="color:var(--text2)">\${fmt(d.impr)}</td><td style="color:var(--text2)">\${fmt(d.clicks)}</td><td>\${ctr.toFixed(2)}%</td><td>\${fUSD(d.cost)}</td><td style="color:var(--text2)">\${fUSD(cpc)}</td></tr>\`;
+          }).join('')}</tbody>
+        </table></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><span class="card-title">Meta Ads · Device Performance (KRW)</span><span class="card-badge meta">Meta</span></div>
+        <div style="overflow-x:auto"><table class="rank-table">
+          <thead><tr><th>Device</th><th>Impressions</th><th>Clicks</th><th>CTR</th><th>Spend (KRW)</th><th>CPC (KRW)</th></tr></thead>
+          <tbody>${fbDevices.map(dev=>{
+            const d=byFbDevice[dev];
+            const ctr=d.impr>0?d.clicks/d.impr*100:0;
+            const cpc=d.clicks>0?d.spend/d.clicks:0;
+            return \`<tr><td style="font-weight:600">\${dev}</td><td style="color:var(--text2)">\${fmt(d.impr)}</td><td style="color:var(--text2)">\${fmt(d.clicks)}</td><td>\${ctr.toFixed(2)}%</td><td>\${fKRW(d.spend)}</td><td style="color:var(--text2)">\${fKRW(cpc)}</td></tr>\`;
+          }).join('')}</tbody>
+        </table></div>
+      </div>
     </div>`;
 
   // KPI cards
@@ -748,8 +774,8 @@ function renderDevice(){
   setTimeout(()=>{
     const c1=document.getElementById('devSpendChart');
     if(c1)charts.devS=new Chart(c1,{type:'doughnut',data:{labels:devices.map(d=>DEVICE_LABELS[d]||d),datasets:[{data:devices.map(d=>byDevice[d].cost.toFixed(2)),backgroundColor:devices.map(d=>DEVICE_COLORS[d]||'rgba(82,82,106,.5)'),borderWidth:2,borderColor:'#111118'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:true,position:'bottom',labels:{color:'#a0a0b8',font:{family:'DM Mono',size:10},padding:10,boxWidth:12}},tooltip:{backgroundColor:'#18181f',borderColor:'#2e2e3d',borderWidth:1,titleColor:'#e2e2ec',bodyColor:'#a0a0b8',titleFont:{family:'DM Mono'},bodyFont:{family:'DM Mono'}}}}});
-    const c2=document.getElementById('devImprChart');
-    if(c2)charts.devI=new Chart(c2,{type:'bar',data:{labels:devices.map(d=>DEVICE_LABELS[d]||d),datasets:[{data:devices.map(d=>byDevice[d].impr),backgroundColor:devices.map(d=>DEVICE_COLORS[d]||'rgba(82,82,106,.5)'),borderWidth:1,borderRadius:4}]},options:{...cDefaults()}});
+    const c2=document.getElementById('devFbSpendChart');
+    if(c2)charts.devFbS=new Chart(c2,{type:'doughnut',data:{labels:fbDevices,datasets:[{data:fbDevices.map(d=>byFbDevice[d].spend.toFixed(0)),backgroundColor:fbDevices.map((_,i)=>['rgba(8,102,255,.7)','rgba(124,111,255,.7)','rgba(34,211,160,.7)','rgba(240,192,64,.7)'][i]||'rgba(82,82,106,.5)'),borderWidth:2,borderColor:'#111118'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:true,position:'bottom',labels:{color:'#a0a0b8',font:{family:'DM Mono',size:10},padding:10,boxWidth:12}},tooltip:{backgroundColor:'#18181f',borderColor:'#2e2e3d',borderWidth:1,titleColor:'#e2e2ec',bodyColor:'#a0a0b8',titleFont:{family:'DM Mono'},bodyFont:{family:'DM Mono'}}}}});
   },50);
 }
 
@@ -760,7 +786,28 @@ function exportExcel(){
 
   const wb=XLSX.utils.book_new();
 
-  // ── Sheet 1: Google Ads by Country ──
+  // ── Sheet 1: Google Ads Campaign ──
+  const gCampHeaders=['Campaign','Impressions','Clicks','CTR (%)','Spend (USD)','CPC (USD)','Conversions'];
+  const gCampRows=[gCampHeaders];
+  state.gSummary.forEach(r=>{
+    const impr=parseInt(r.metrics.impressions||0);
+    const clicks=parseInt(r.metrics.clicks||0);
+    const cost=parseInt(r.metrics.costMicros||0)/1e6;
+    const ctr=impr>0?(clicks/impr*100):0;
+    const cpc=clicks>0?(cost/clicks):0;
+    gCampRows.push([r.campaign.name,impr,clicks,parseFloat(ctr.toFixed(2)),parseFloat(cost.toFixed(2)),parseFloat(cpc.toFixed(2)),parseFloat(r.metrics.conversions||0)]);
+  });
+  const gCampTotImpr=state.gSummary.reduce((s,r)=>s+parseInt(r.metrics.impressions||0),0);
+  const gCampTotClicks=state.gSummary.reduce((s,r)=>s+parseInt(r.metrics.clicks||0),0);
+  const gCampTotCost=state.gSummary.reduce((s,r)=>s+parseInt(r.metrics.costMicros||0)/1e6,0);
+  const gCampTotCTR=gCampTotImpr>0?(gCampTotClicks/gCampTotImpr*100):0;
+  const gCampTotCPC=gCampTotClicks>0?(gCampTotCost/gCampTotClicks):0;
+  gCampRows.push(['TOTAL',gCampTotImpr,gCampTotClicks,parseFloat(gCampTotCTR.toFixed(2)),parseFloat(gCampTotCost.toFixed(2)),parseFloat(gCampTotCPC.toFixed(2)),'']);
+  const wsCamp=XLSX.utils.aoa_to_sheet(gCampRows);
+  wsCamp['!cols']=[{wch:50},{wch:16},{wch:12},{wch:10},{wch:14},{wch:12},{wch:14}];
+  XLSX.utils.book_append_sheet(wb,wsCamp,'Google Ads - Campaign');
+
+  // ── Sheet 2: Google Ads by Country ──
   const GROUP_ORDER=['Group1','Group2','Group3','Group4','Other'];
   const GROUP_COUNTRIES={
     Group1:['Netherlands','United Kingdom','Germany','Austria','Switzerland','Sweden','Australia','USA','South Korea','Canada'],
@@ -920,6 +967,26 @@ function exportExcel(){
   const ws3=XLSX.utils.aoa_to_sheet(devRows);
   ws3['!cols']=[{wch:16},{wch:14},{wch:12},{wch:10},{wch:14},{wch:12}];
   XLSX.utils.book_append_sheet(wb,ws3,'Google Ads - Device');
+
+  // ── Sheet 5: Meta Ads Device ──
+  const fbDevHeaders=['Device','Impressions','Clicks','CTR (%)','Spend (KRW)','CPC (KRW)'];
+  const fbDevRows=[fbDevHeaders];
+  const fbDevAgg={};
+  state.fbDevice.forEach(r=>{
+    const dev=r.device_platform||'other';
+    if(!fbDevAgg[dev])fbDevAgg[dev]={impr:0,clicks:0,spend:0};
+    fbDevAgg[dev].impr+=parseInt(r.impressions||0);
+    fbDevAgg[dev].clicks+=parseInt(r.clicks||0);
+    fbDevAgg[dev].spend+=parseFloat(r.spend||0);
+  });
+  Object.entries(fbDevAgg).forEach(([dev,d])=>{
+    const ctr=d.impr>0?d.clicks/d.impr*100:0;
+    const cpc=d.clicks>0?d.spend/d.clicks:0;
+    fbDevRows.push([dev,d.impr,d.clicks,parseFloat(ctr.toFixed(2)),Math.round(d.spend),Math.round(cpc)]);
+  });
+  const ws5fb=XLSX.utils.aoa_to_sheet(fbDevRows);
+  ws5fb['!cols']=[{wch:18},{wch:14},{wch:12},{wch:10},{wch:14},{wch:12}];
+  XLSX.utils.book_append_sheet(wb,ws5fb,'Meta Ads - Device');
 
   // Download
   const dateStr=state.dateStart+'_'+state.dateEnd;
