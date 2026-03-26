@@ -259,10 +259,6 @@ function toggleMetric(el){
   else{state.metrics=state.metrics.filter(m=>m!==v);}
 }
 
-function filterCampaigns(){
-  const q=document.getElementById('campaignSearch').value.toLowerCase();
-  document.querySelectorAll('.campaign-item').forEach(el=>{el.style.display=el.dataset.name.toLowerCase().includes(q)?'':'none';});
-}
 
 function selectAllCampaigns(){
   const allSel=state.selectedCampaigns.size===state.allCampaigns.length;
@@ -274,14 +270,27 @@ function selectAllCampaigns(){
 function renderCampaignList(){
   const list=document.getElementById('campaignList');
   if(!list)return;
-  list.innerHTML=state.allCampaigns.map(c=>`<div class="campaign-item ${state.selectedCampaigns.has(c)?'selected':''}" data-name="${c.replace(/"/g,'&quot;')}" onclick="toggleCampaign(this)">${c.length>34?c.slice(0,34)+'…':c}</div>`).join('');
+  list.innerHTML='';
+  state.allCampaigns.forEach((c,i)=>{
+    const el=document.createElement('div');
+    el.className='campaign-item'+(state.selectedCampaigns.has(c)?' selected':'');
+    el.textContent=c.length>34?c.slice(0,34)+'…':c;
+    el.title=c;
+    el.dataset.idx=i;
+    el.addEventListener('click',()=>{
+      if(state.selectedCampaigns.has(c))state.selectedCampaigns.delete(c);
+      else state.selectedCampaigns.add(c);
+      el.classList.toggle('selected',state.selectedCampaigns.has(c));
+    });
+    list.appendChild(el);
+  });
 }
 
-function toggleCampaign(el){
-  const name=el.dataset.name;
-  if(state.selectedCampaigns.has(name))state.selectedCampaigns.delete(name);
-  else state.selectedCampaigns.add(name);
-  el.classList.toggle('selected',state.selectedCampaigns.has(name));
+function filterCampaigns(){
+  const q=document.getElementById('campaignSearch').value.toLowerCase();
+  document.querySelectorAll('.campaign-item').forEach((el,i)=>{
+    el.style.display=state.allCampaigns[i]?.toLowerCase().includes(q)?'':'none';
+  });
 }
 
 async function loadData(){
@@ -481,8 +490,9 @@ async function genInsight(type){
     recommend:`디지털 마케팅 전략가로서 아래 성과 데이터를 기반으로 캠페인 성과를 개선하기 위한 구체적이고 실행 가능한 권고사항 3-5가지를 한국어로 작성하세요. 각 권고사항에는 구체적인 데이터 근거를 포함하세요.\n\n${ctx}`,
   };
   try{
-    const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,messages:[{role:'user',content:prompts[type]}]})});
+    const res=await fetch(WORKER+'/ai',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messages:[{role:'user',content:prompts[type]}]})});
     const data=await res.json();
+    if(data.error)throw new Error(data.error);
     el.textContent=data.content?.find(b=>b.type==='text')?.text||'분석 결과를 가져올 수 없습니다.';
   }catch(e){el.textContent='⚠ AI 분석 중 오류: '+e.message;}
   document.querySelectorAll('.insight-btn').forEach(b=>b.disabled=false);
