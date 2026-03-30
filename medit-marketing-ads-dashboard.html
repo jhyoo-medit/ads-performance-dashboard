@@ -374,7 +374,7 @@ const fGD=()=>state.platforms.google?state.gDaily.filter(r=>state.selectedCampai
 const fFbD=()=>state.platforms.meta?state.fbDaily.filter(r=>state.selectedCampaigns.has(r.campaign_name)):[];
 
 function aggG(d){return d.reduce((a,r)=>{a.impr+=parseInt(r.metrics.impressions||0);a.clicks+=parseInt(r.metrics.clicks||0);a.cost+=parseInt(r.metrics.costMicros||0)/1e6;return a;},{impr:0,clicks:0,cost:0});}
-function aggFb(d){return d.reduce((a,r)=>{a.impr+=parseInt(r.impressions||0);a.clicks+=parseInt(r.clicks||0);a.spend+=parseFloat(r.spend||0);a.video_view+=parseInt(r.video_p_3_sec_watched_actions||0);a.vp25+=parseInt(r.video_p25_watched_actions||0);a.vp50+=parseInt(r.video_p50_watched_actions||0);a.vp75+=parseInt(r.video_p75_watched_actions||0);a.vp100+=parseInt(r.video_p100_watched_actions||0);return a;},{impr:0,clicks:0,spend:0,video_view:0,vp25:0,vp50:0,vp75:0,vp100:0});}
+function aggFb(d){return d.reduce((a,r)=>{a.impr+=parseInt(r.impressions||0);a.clicks+=parseInt(r.clicks||0);a.spend+=parseFloat(r.spend||0);a.video_view+=parseInt((r.actions||[]).find(a=>a.action_type==='video_view')?.value||0);a.vp25+=parseInt(r.video_p25_watched_actions||0);a.vp50+=parseInt(r.video_p50_watched_actions||0);a.vp75+=parseInt(r.video_p75_watched_actions||0);a.vp100+=parseInt(r.video_p100_watched_actions||0);return a;},{impr:0,clicks:0,spend:0,video_view:0,vp25:0,vp50:0,vp75:0,vp100:0});}
 function derived(impr,clicks,cost){return{ctr:impr>0?clicks/impr*100:0,cpm:impr>0?cost/impr*1000:0,cpc:clicks>0?cost/clicks:0};}
 
 const fmt=n=>Number(n).toLocaleString();
@@ -1047,7 +1047,7 @@ function exportExcel(){
   const fbVideoRows=[fbVideoHeaders];
   state.fbSummary.forEach(r=>{
     const impr=parseInt(r.impressions||0);
-    const vv=parseInt(r.video_p_3_sec_watched_actions||0);
+    const vv=parseInt((r.actions||[]).find(a=>a.action_type==='video_view')?.value||0);
     const vtr=impr>0?(vv/impr*100):0;
     if(vv>0){
       fbVideoRows.push([
