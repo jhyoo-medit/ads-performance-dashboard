@@ -374,11 +374,11 @@ const fGD=()=>state.platforms.google?state.gDaily.filter(r=>state.selectedCampai
 const fFbD=()=>state.platforms.meta?state.fbDaily.filter(r=>state.selectedCampaigns.has(r.campaign_name)):[];
 
 function aggG(d){return d.reduce((a,r)=>{a.impr+=parseInt(r.metrics.impressions||0);a.clicks+=parseInt(r.metrics.clicks||0);a.cost+=parseInt(r.metrics.costMicros||0)/1e6;return a;},{impr:0,clicks:0,cost:0});}
-function aggFb(d){return d.reduce((a,r)=>{a.impr+=parseInt(r.impressions||0);a.clicks+=parseInt(r.clicks||0);a.spend+=parseFloat(r.spend||0);a.video_view+=parseInt(r.video_view||0);a.vp25+=parseInt(r.video_p25_watched_actions||0);a.vp50+=parseInt(r.video_p50_watched_actions||0);a.vp75+=parseInt(r.video_p75_watched_actions||0);a.vp100+=parseInt(r.video_p100_watched_actions||0);return a;},{impr:0,clicks:0,spend:0,video_view:0,vp25:0,vp50:0,vp75:0,vp100:0});}
+function aggFb(d){return d.reduce((a,r)=>{a.impr+=parseInt(r.impressions||0);a.clicks+=parseInt(r.clicks||0);a.spend+=parseFloat(r.spend||0);a.video_view+=parseInt(r.video_p_3_sec_watched_actions||0);a.vp25+=parseInt(r.video_p25_watched_actions||0);a.vp50+=parseInt(r.video_p50_watched_actions||0);a.vp75+=parseInt(r.video_p75_watched_actions||0);a.vp100+=parseInt(r.video_p100_watched_actions||0);return a;},{impr:0,clicks:0,spend:0,video_view:0,vp25:0,vp50:0,vp75:0,vp100:0});}
 function derived(impr,clicks,cost){return{ctr:impr>0?clicks/impr*100:0,cpm:impr>0?cost/impr*1000:0,cpc:clicks>0?cost/clicks:0};}
 
 const fmt=n=>Number(n).toLocaleString();
-const fUSD=n=>'$'+Number(n).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,',');
+const fUSD=n=>'₩'+Math.round(Number(n)).toLocaleString();
 const fKRW=n=>'₩'+Math.round(n).toLocaleString();
 const fPct=n=>Number(n).toFixed(2)+'%';
 
@@ -393,7 +393,7 @@ function renderOverview(){
     if(state.metrics.includes('impressions'))kpis.push({p:'google',l:'Impressions',v:fmt(ga.impr)});
     if(state.metrics.includes('clicks'))kpis.push({p:'google',l:'Clicks',v:fmt(ga.clicks)});
     if(state.metrics.includes('ctr'))kpis.push({p:'google',l:'CTR',v:fPct(gm.ctr)});
-    if(state.metrics.includes('spend'))kpis.push({p:'google',l:'Spend (USD)',v:fUSD(ga.cost)});
+    if(state.metrics.includes('spend'))kpis.push({p:'google',l:'Spend (KRW)',v:fUSD(ga.cost)});
   }
   if(state.platforms.meta){
     if(state.metrics.includes('impressions'))kpis.push({p:'meta',l:'Impressions',v:fmt(fa.impr)});
@@ -441,14 +441,14 @@ function renderTrends(){
     const ds=(gk,fbk,gs=1,fs=1)=>[{label:'Google Ads',data:dates.map(d=>((gByD[d]?.[gk]||0)*gs).toFixed(0)),borderColor:'#4285f4',backgroundColor:'rgba(66,133,244,.08)',fill:true,tension:.3,pointRadius:2,pointHoverRadius:4},{label:'Meta Ads',data:dates.map(d=>((fbByD[d]?.[fbk]||0)*fs).toFixed(0)),borderColor:'#0866ff',backgroundColor:'rgba(8,102,255,.08)',fill:true,tension:.3,pointRadius:2,pointHoverRadius:4}];
     const c1=document.getElementById('tImpr');if(c1)charts.tI=new Chart(c1,{type:'line',data:{labels:dates,datasets:ds('impr','impr')},options:opts});
     const c2=document.getElementById('tClk');if(c2)charts.tC=new Chart(c2,{type:'line',data:{labels:dates,datasets:ds('clicks','clicks')},options:opts});
-    const c3=document.getElementById('tSpd');if(c3)charts.tS=new Chart(c3,{type:'line',data:{labels:dates,datasets:[{label:'Google (USD)',data:dates.map(d=>(gByD[d]?.cost||0).toFixed(2)),borderColor:'#4285f4',backgroundColor:'rgba(66,133,244,.07)',fill:true,tension:.3,pointRadius:2},{label:'Meta (KRW ÷1000)',data:dates.map(d=>((fbByD[d]?.spend||0)/1000).toFixed(2)),borderColor:'#0866ff',backgroundColor:'rgba(8,102,255,.07)',fill:true,tension:.3,pointRadius:2}]},options:opts});
+    const c3=document.getElementById('tSpd');if(c3)charts.tS=new Chart(c3,{type:'line',data:{labels:dates,datasets:[{label:'Google (KRW)',data:dates.map(d=>(gByD[d]?.cost||0).toFixed(2)),borderColor:'#4285f4',backgroundColor:'rgba(66,133,244,.07)',fill:true,tension:.3,pointRadius:2},{label:'Meta (KRW ÷1000)',data:dates.map(d=>((fbByD[d]?.spend||0)/1000).toFixed(2)),borderColor:'#0866ff',backgroundColor:'rgba(8,102,255,.07)',fill:true,tension:.3,pointRadius:2}]},options:opts});
   },50);
 }
 
 // ── Ranking ──
 function renderRanking(){
   const rows=[];
-  fG().forEach(r=>{const impr=parseInt(r.metrics.impressions||0),clicks=parseInt(r.metrics.clicks||0),cost=parseInt(r.metrics.costMicros||0)/1e6,ctr=impr>0?clicks/impr*100:0,cpm=impr>0?cost/impr*1000:0,cpc=clicks>0?cost/clicks:0;rows.push({name:r.campaign.name,p:'google',impr,clicks,ctr,spend:cost,cpm,cpc,cur:'USD'});});
+  fG().forEach(r=>{const impr=parseInt(r.metrics.impressions||0),clicks=parseInt(r.metrics.clicks||0),cost=parseInt(r.metrics.costMicros||0)/1e6,ctr=impr>0?clicks/impr*100:0,cpm=impr>0?cost/impr*1000:0,cpc=clicks>0?cost/clicks:0;rows.push({name:r.campaign.name,p:'google',impr,clicks,ctr,spend:cost,cpm,cpc,cur:'KRW'});});
   fFb().forEach(r=>{const impr=parseInt(r.impressions||0),clicks=parseInt(r.clicks||0),spend=parseFloat(r.spend||0),ctr=parseFloat(r.ctr||0),cpm=impr>0?spend/impr*1000:0,cpc=clicks>0?spend/clicks:0;rows.push({name:r.campaign_name,p:'meta',impr,clicks,ctr,spend,cpm,cpc,cur:'KRW'});});
   const maxCTR=Math.max(...rows.map(r=>r.ctr),.01);
   rows.forEach(r=>{r.score=r.ctr/maxCTR*100;});
@@ -628,13 +628,13 @@ function renderGeo(){
   const area=document.getElementById('contentArea');
   area.innerHTML=`
     <div class="chart-row">
-      <div class="card"><div class="card-header"><span class="card-title">Google Ads · Spend by Group (USD)</span><span class="card-badge google">Google</span></div><div class="chart-wrap"><canvas id="geoGroupChart"></canvas></div></div>
+      <div class="card"><div class="card-header"><span class="card-title">Google Ads · Spend by Group (KRW)</span><span class="card-badge google">Google</span></div><div class="chart-wrap"><canvas id="geoGroupChart"></canvas></div></div>
       <div class="card"><div class="card-header"><span class="card-title">Meta Ads · Spend by Group (KRW)</span><span class="card-badge meta">Meta</span></div><div class="chart-wrap"><canvas id="geoFbGroupChart"></canvas></div></div>
     </div>
     <div class="card" style="margin-bottom:16px">
-      <div class="card-header"><span class="card-title">Country Performance · Google Ads (USD)</span><span class="card-badge google">Google</span></div>
+      <div class="card-header"><span class="card-title">Country Performance · Google Ads (KRW)</span><span class="card-badge google">Google</span></div>
       <div style="overflow-x:auto"><table class="rank-table">
-        <thead><tr><th>#</th><th>Country</th><th>Group</th><th>Impressions</th><th>Clicks</th><th>CTR</th><th>Spend (USD)</th></tr></thead>
+        <thead><tr><th>#</th><th>Country</th><th>Group</th><th>Impressions</th><th>Clicks</th><th>CTR</th><th>Spend (KRW)</th></tr></thead>
         <tbody id="geoTableBody"></tbody>
       </table></div>
     </div>
@@ -747,14 +747,14 @@ function renderDevice(){
   area.innerHTML=`
     <div class="kpi-grid" id="deviceKpis"></div>
     <div class="chart-row">
-      <div class="card"><div class="card-header"><span class="card-title">Google Ads · Spend by Device (USD)</span><span class="card-badge google">Google</span></div><div class="chart-wrap"><canvas id="devSpendChart"></canvas></div></div>
+      <div class="card"><div class="card-header"><span class="card-title">Google Ads · Spend by Device (KRW)</span><span class="card-badge google">Google</span></div><div class="chart-wrap"><canvas id="devSpendChart"></canvas></div></div>
       <div class="card"><div class="card-header"><span class="card-title">Meta Ads · Spend by Device (KRW)</span><span class="card-badge meta">Meta</span></div><div class="chart-wrap"><canvas id="devFbSpendChart"></canvas></div></div>
     </div>
     <div class="chart-row">
       <div class="card">
-        <div class="card-header"><span class="card-title">Google Ads · Device Performance (USD)</span><span class="card-badge google">Google</span></div>
+        <div class="card-header"><span class="card-title">Google Ads · Device Performance (KRW)</span><span class="card-badge google">Google</span></div>
         <div style="overflow-x:auto"><table class="rank-table">
-          <thead><tr><th>Device</th><th>Impressions</th><th>Clicks</th><th>CTR</th><th>Spend (USD)</th><th>CPC (USD)</th></tr></thead>
+          <thead><tr><th>Device</th><th>Impressions</th><th>Clicks</th><th>CTR</th><th>Spend (KRW)</th><th>CPC (KRW)</th></tr></thead>
           <tbody>${devices.map(dev=>{
             const d=byDevice[dev];
             const ctr=d.impr>0?d.clicks/d.impr*100:0;
@@ -841,7 +841,7 @@ function exportExcel(){
   const wb=XLSX.utils.book_new();
 
   // ── Sheet 1: Google Ads Campaign ──
-  const gCampHeaders=['Campaign','Impressions','Clicks','CTR (%)','Spend (USD)','CPC (USD)','Conversions'];
+  const gCampHeaders=['Campaign','Impressions','Clicks','CTR (%)','Spend (KRW)','CPC (KRW)','Conversions'];
   const gCampRows=[gCampHeaders];
   state.gSummary.forEach(r=>{
     const impr=parseInt(r.metrics.impressions||0);
@@ -900,9 +900,9 @@ function exportExcel(){
     gHeaders.push(c+' - Impressions');
     gHeaders.push(c+' - Clicks');
     gHeaders.push(c+' - CTR (%)');
-    gHeaders.push(c+' - Spend (USD)');
+    gHeaders.push(c+' - Spend (KRW)');
   });
-  gHeaders.push('Total Impressions','Total Clicks','Total CTR (%)','Total Spend (USD)');
+  gHeaders.push('Total Impressions','Total Clicks','Total CTR (%)','Total Spend (KRW)');
 
   const gRows=[gHeaders];
 
@@ -1002,7 +1002,7 @@ function exportExcel(){
   XLSX.utils.book_append_sheet(wb,ws3fb,'Meta Ads - Country');
 
   // ── Sheet 3: Google Ads Device ──
-  const devHeaders=['Device','Impressions','Clicks','CTR (%)','Spend (USD)','CPC (USD)'];
+  const devHeaders=['Device','Impressions','Clicks','CTR (%)','Spend (KRW)','CPC (KRW)'];
   const devRows=[devHeaders];
   const DEVICE_LABELS={'MOBILE':'Mobile','DESKTOP':'Desktop','TABLET':'Tablet','CONNECTED_TV':'Connected TV','OTHER':'Other'};
   const devAgg={};
@@ -1047,7 +1047,7 @@ function exportExcel(){
   const fbVideoRows=[fbVideoHeaders];
   state.fbSummary.forEach(r=>{
     const impr=parseInt(r.impressions||0);
-    const vv=parseInt(r.video_view||0);
+    const vv=parseInt(r.video_p_3_sec_watched_actions||0);
     const vtr=impr>0?(vv/impr*100):0;
     if(vv>0){
       fbVideoRows.push([
